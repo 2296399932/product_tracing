@@ -179,7 +179,12 @@ export default {
     }
   },
   created() {
-
+    console.log('Layout userInfo:', {
+      username: this.userInfo.username,
+      role: this.userInfo.role,
+      email: this.userInfo.email,
+      id: this.userInfo.id
+    })
   },
   methods: {
     toggleCollapse() {
@@ -222,9 +227,6 @@ export default {
         this.$router.push('/settings')
       }
     },
-
-
-
     updateBreadcrumbs(route) {
       // 根据路由更新面包屑
       this.breadcrumbs = route.matched

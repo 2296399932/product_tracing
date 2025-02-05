@@ -29,8 +29,14 @@ export default {
         password: ''
       },
       loginRules: {
-        username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-        password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+        username: [
+          { required: true, message: '请输入用户名', trigger: 'blur' },
+          { min: 3, max: 20, message: '用户名长度在 3 到 20 个字符', trigger: 'blur' }
+        ],
+        password: [
+          { required: true, message: '请输入密码', trigger: 'blur' },
+          { min: 6, message: '密码长度不能小于6个字符', trigger: 'blur' }
+        ]
       },
       loading: false
     }
@@ -41,23 +47,23 @@ export default {
         if (valid) {
           this.loading = true
           try {
-            const response = await this.$axios.post('/api/users/auth/login/', {
-              username: this.loginForm.username,
-              password: this.loginForm.password
-            })
+            const response = await this.$axios.post('/api/users/auth/login/', this.loginForm)
+            console.log('Login response:', response)
             
-            // 保存 token
-            localStorage.setItem('token', response.data.token)
-            
-            // 保存用户信息
-            localStorage.setItem('user', JSON.stringify(response.data.user))
-            
-            // 跳转到首页
-            this.$router.push('/')
-            
-            this.$message.success('登录成功')
+            if (response.data && response.data.token) {
+              console.log('Storing token:', response.data.token)
+              localStorage.setItem('token', response.data.token)
+              localStorage.setItem('userInfo', JSON.stringify(response.data.user))
+              
+              this.$message.success('登录成功')
+              this.$router.push('/')
+            } else {
+              this.$message.error('登录失败：响应格式错误')
+              console.error('Invalid login response:', response)
+            }
           } catch (error) {
-            this.$message.error(error.response?.data?.message || '登录失败')
+            console.error('Login error:', error)
+            this.$message.error(error.response?.data?.error || '登录失败')
           } finally {
             this.loading = false
           }

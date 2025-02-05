@@ -5,6 +5,18 @@
       <el-form-item prop="username">
         <el-input v-model="registerForm.username" placeholder="用户名" />
       </el-form-item>
+      <el-form-item prop="email">
+        <el-input v-model="registerForm.email" placeholder="邮箱" />
+      </el-form-item>
+      <el-form-item prop="phone">
+        <el-input v-model="registerForm.phone" placeholder="手机号" />
+      </el-form-item>
+      <el-form-item prop="company_name">
+        <el-input v-model="registerForm.company_name" placeholder="公司名称" />
+      </el-form-item>
+      <el-form-item prop="address">
+        <el-input v-model="registerForm.address" placeholder="地址" />
+      </el-form-item>
       <el-form-item prop="password">
         <el-input v-model="registerForm.password" type="password" placeholder="密码" />
       </el-form-item>
@@ -51,6 +63,10 @@ export default {
     return {
       registerForm: {
         username: '',
+        email: '',
+        phone: '',
+        company_name: '',
+        address: '',
         password: '',
         confirmPassword: ''
       },
@@ -58,6 +74,20 @@ export default {
         username: [
           { required: true, message: '请输入用户名', trigger: 'blur' },
           { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
+        ],
+        email: [
+          { required: true, message: '请输入邮箱地址', trigger: 'blur' },
+          { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+        ],
+        phone: [
+          { required: true, message: '请输入手机号', trigger: 'blur' },
+          { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+        ],
+        company_name: [
+          { max: 100, message: '公司名称不能超过100个字符', trigger: 'blur' }
+        ],
+        address: [
+          { max: 200, message: '地址不能超过200个字符', trigger: 'blur' }
         ],
         password: [
           { required: true, validator: validatePass, trigger: 'blur' },
@@ -78,6 +108,10 @@ export default {
           try {
             const response = await this.$axios.post('/api/users/auth/register/', {
               username: this.registerForm.username,
+              email: this.registerForm.email,
+              phone: this.registerForm.phone,
+              company_name: this.registerForm.company_name,
+              address: this.registerForm.address,
               password: this.registerForm.password,
               confirm_password: this.registerForm.confirmPassword
             })
@@ -124,7 +158,7 @@ export default {
 }
 
 .register-form {
-  width: 350px;
+  width: 400px;
   padding: 35px;
   background: #fff;
   border-radius: 5px;

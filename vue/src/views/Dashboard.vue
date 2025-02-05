@@ -177,6 +177,16 @@ export default {
   mounted() {
     this.initCharts()
     this.fetchData()
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    console.log('User Info:', {
+      username: userInfo.username || '未知用户',
+      role: userInfo.role || '未知角色',
+      email: userInfo.email || '未知邮箱',
+      id: userInfo.id || '未知ID',
+      is_active: userInfo.is_active ? '启用' : '禁用',
+      phone: userInfo.phone || '未知手机号',
+      last_login: userInfo.last_login || '从未登录'
+    })
   },
   methods: {
     initCharts() {

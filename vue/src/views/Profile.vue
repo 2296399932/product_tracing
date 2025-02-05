@@ -8,7 +8,37 @@
         </el-button>
       </div>
       
-
+      <!-- 个人信息表单 -->
+      <el-form :model="form" :rules="rules" ref="form" label-width="100px" :disabled="!isEditing">
+        <el-form-item label="用户名">
+          <el-input v-model="form.username" disabled></el-input>
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="form.email"></el-input>
+        </el-form-item>
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="form.phone"></el-input>
+        </el-form-item>
+        <el-form-item label="公司名称" prop="company_name">
+          <el-input v-model="form.company_name"></el-input>
+        </el-form-item>
+        <el-form-item label="地址" prop="address">
+          <el-input v-model="form.address"></el-input>
+        </el-form-item>
+        <el-form-item label="角色">
+          <el-input v-model="form.role" disabled></el-input>
+        </el-form-item>
+        <el-form-item label="创建时间">
+          <el-input v-model="formattedCreatedAt" disabled></el-input>
+        </el-form-item>
+        <el-form-item label="最后登录">
+          <el-input v-model="formattedLastLogin" disabled></el-input>
+        </el-form-item>
+        <el-form-item v-if="isEditing">
+          <el-button type="primary" @click="handleSubmit">保存</el-button>
+          <el-button @click="handleEdit">取消</el-button>
+        </el-form-item>
+      </el-form>
 
       <!-- 修改密码表单 -->
       <div class="password-section">
@@ -61,8 +91,12 @@ export default {
         username: '',
         email: '',
         phone: '',
-        real_name: '',
-        address: ''
+        company_name: '',
+        address: '',
+        role: '',
+        created_at: '',
+        last_login: '',
+        is_active: true
       },
       passwordForm: {
         old_password: '',
@@ -93,13 +127,26 @@ export default {
       }
     }
   },
+  computed: {
+    formattedCreatedAt() {
+      return this.form.created_at ? new Date(this.form.created_at).toLocaleString() : '未知'
+    },
+    formattedLastLogin() {
+      return this.form.last_login ? new Date(this.form.last_login).toLocaleString() : '从未登录'
+    }
+  },
   created() {
     this.fetchUserInfo()
   },
   methods: {
     fetchUserInfo() {
-      this.$axios.get(this.$httpUrl + '/api/users/profile/')
+      this.$axios.get('/api/users/profile/')
         .then(res => {
+          const roleMap = {
+            'admin': '管理员',
+            'user': '普通用户'
+          }
+          res.data.role = roleMap[res.data.role] || res.data.role
           this.form = res.data
         })
         .catch(err => {
@@ -108,18 +155,24 @@ export default {
         })
     },
     handleEdit() {
-      this.isEditing = !this.isEditing
-      if (!this.isEditing) {
+      if (this.isEditing) {
         this.fetchUserInfo()
       }
+      this.isEditing = !this.isEditing
     },
     handleSubmit() {
       this.$refs.form.validate(valid => {
         if (valid) {
-          this.$axios.put(this.$httpUrl + '/api/users/profile/', this.form)
+          this.$axios.put('/api/users/profile/', {
+            email: this.form.email,
+            phone: this.form.phone,
+            company_name: this.form.company_name,
+            address: this.form.address
+          })
             .then(() => {
               this.$message.success('更新成功')
               this.isEditing = false
+              this.fetchUserInfo()
             })
             .catch(err => {
               this.$message.error('更新失败')
@@ -167,5 +220,12 @@ export default {
 .section-title {
   font-size: 18px;
   margin-bottom: 20px;
+}
+.el-form-item {
+  margin-bottom: 22px;
+}
+.disabled-input .el-input__inner {
+  background-color: #f5f7fa;
+  color: #909399;
 }
 </style> 

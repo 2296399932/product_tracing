@@ -3,18 +3,18 @@ from django.db import models
 
 class User(AbstractUser):
     """用户模型"""
-    phone = models.CharField(max_length=11, blank=True, null=True, verbose_name='手机号')
+    phone = models.CharField(max_length=11, blank=True)
     ROLE_CHOICES = (
         ('admin', '管理员'),
         ('user', '普通用户'),
     )
     
-    role = models.CharField('用户角色', max_length=20, choices=ROLE_CHOICES, default='user')
-    company_name = models.CharField('公司名称', max_length=100, blank=True)
-    address = models.CharField(max_length=200, blank=True, null=True, verbose_name='地址')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='user')
+    company_name = models.CharField(max_length=100, blank=True)
+    address = models.CharField(max_length=200, blank=True)
     is_active = models.BooleanField(default=True, verbose_name='是否激活')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     # 添加 related_name 来解决冲突
     groups = models.ManyToManyField(
@@ -33,6 +33,10 @@ class User(AbstractUser):
         related_name='custom_user_set',
         related_query_name='custom_user'
     )
+
+    @property
+    def is_admin(self):
+        return self.role == 'admin'
 
     class Meta:
         verbose_name = '用户'

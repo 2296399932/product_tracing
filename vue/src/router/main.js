@@ -99,6 +99,12 @@ const routes = [
         },
         beforeEnter: (to, from, next) => {
           const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+          console.log('Router guard userInfo:', {
+            username: userInfo.username,
+            role: userInfo.role,
+            email: userInfo.email,
+            id: userInfo.id
+          })
           if (userInfo.role === 'admin') {
             next()
           } else {
@@ -117,6 +123,12 @@ const routes = [
         },
         beforeEnter: (to, from, next) => {
           const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+          console.log('Router guard userInfo:', {
+            username: userInfo.username,
+            role: userInfo.role,
+            email: userInfo.email,
+            id: userInfo.id
+          })
           if (userInfo.role === 'admin') {
             next()
           } else {
