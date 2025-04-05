@@ -100,3 +100,10 @@ class UserSerializer(serializers.ModelSerializer):
         for field in self.Meta.read_only_fields:
             data.pop(field, None)
         return data 
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'phone', 'company_name', 
+                 'address', 'role', 'created_at', 'last_login']
+        read_only_fields = ['username', 'role', 'created_at', 'last_login'] 

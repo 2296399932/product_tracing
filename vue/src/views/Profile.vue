@@ -136,12 +136,18 @@ export default {
     }
   },
   created() {
+    console.log('Profile component created, token:', localStorage.getItem('token'))
     this.fetchUserInfo()
   },
   methods: {
     fetchUserInfo() {
-      this.$axios.get('/api/users/profile/')
+      // 打印请求配置
+      console.log('Requesting profile with URL:', this.$httpUrl + '/api/users/profile/')
+      console.log('Request headers:', this.$axios.defaults.headers)
+      
+      this.$axios.get(this.$httpUrl + '/api/users/profile/')
         .then(res => {
+          console.log('Profile response:', res)
           const roleMap = {
             'admin': '管理员',
             'user': '普通用户'
@@ -150,8 +156,13 @@ export default {
           this.form = res.data
         })
         .catch(err => {
+          console.error('Profile error details:', {
+            status: err.response?.status,
+            data: err.response?.data,
+            headers: err.response?.headers,
+            config: err.config
+          })
           this.$message.error('获取用户信息失败')
-          console.error(err)
         })
     },
     handleEdit() {
@@ -163,7 +174,7 @@ export default {
     handleSubmit() {
       this.$refs.form.validate(valid => {
         if (valid) {
-          this.$axios.put('/api/users/profile/', {
+          this.$axios.put(this.$httpUrl + '/api/users/profile/', {
             email: this.form.email,
             phone: this.form.phone,
             company_name: this.form.company_name,
@@ -175,8 +186,8 @@ export default {
               this.fetchUserInfo()
             })
             .catch(err => {
-              this.$message.error('更新失败')
-              console.error(err)
+              console.error('Profile update error:', err.response?.data || err)
+              this.$message.error(err.response?.data?.error || '更新失败')
             })
         }
       })
@@ -184,21 +195,30 @@ export default {
     handleChangePassword() {
       this.$refs.passwordForm.validate(valid => {
         if (valid) {
-          // eslint-disable-next-line no-unused-vars
-          /* eslint-disable */
-          const { confirm_password, ...data } = this.passwordForm
-          this.$axios.post(this.$httpUrl + '/api/users/profile/change-password/', data)
+          // 确保刷新axios默认设置的token
+          const token = localStorage.getItem('token');
+          const headers = {
+            'Authorization': `Bearer ${token}`
+          };
+
+          const { ...data } = this.passwordForm;
+          this.$axios.post(this.$httpUrl + '/api/users/profile/change-password/', data, { headers })
             .then(() => {
-              this.$message.success('密码修改成功，请重新登录')
-              localStorage.removeItem('token')
-              localStorage.removeItem('userInfo')
-              this.$router.push('/login')
+              this.$message.success('密码修改成功，请重新登录');
+              // 清理本地存储并跳转到登录页
+              localStorage.removeItem('token');
+              localStorage.removeItem('userInfo');
+              setTimeout(() => {
+                this.$router.push('/login');
+              }, 1500);
             })
             .catch(err => {
-              this.$message.error(err.response?.data?.error || '密码修改失败')
-            })
+              console.error('Password change error:', err.response?.data || err);
+              const errorMsg = err.response?.data?.error || '密码修改失败，请确认当前密码正确';
+              this.$message.error(errorMsg);
+            });
         }
-      })
+      });
     }
   }
 }

@@ -4,7 +4,7 @@
       <h2>商品列表</h2>
       <div>
         <el-button type="primary" @click="handleAddCategory" style="margin-right: 10px">添加分类</el-button>
-        <el-button type="primary" @click="handleAdd">添加商品</el-button>
+        <el-button type="primary" @click="handleAdd" v-if="!isAdmin">添加商品</el-button>
       </div>
     </div>
 
@@ -32,6 +32,19 @@
     <!-- 商品列表 -->
     <el-table :data="products" border style="width: 100%">
       <el-table-column prop="code" label="商品编码" width="120"></el-table-column>
+      <el-table-column label="商品图片" width="100">
+        <template slot-scope="scope">
+          <el-image 
+            style="width: 50px; height: 50px"
+            :src="scope.row.image || defaultImage"
+            :preview-src-list="scope.row.image ? [scope.row.image] : []"
+            fit="cover">
+            <div slot="error" class="image-slot">
+              <i class="el-icon-picture-outline"></i>
+            </div>
+          </el-image>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="商品名称"></el-table-column>
       <el-table-column prop="category_name" label="商品分类"></el-table-column>
       <el-table-column prop="price" label="价格" width="100">
@@ -40,6 +53,24 @@
         </template>
       </el-table-column>
       <el-table-column prop="unit" label="单位" width="80"></el-table-column>
+      <el-table-column label="规格参数" width="150">
+        <template slot-scope="scope">
+          <el-popover
+            placement="top-start"
+            width="300"
+            trigger="hover">
+            <div v-html="formatSpecifications(scope.row.specifications)"></div>
+            <el-button slot="reference" type="text">查看规格</el-button>
+          </el-popover>
+        </template>
+      </el-table-column>
+      <el-table-column label="商品描述" width="150">
+        <template slot-scope="scope">
+          <el-tooltip :content="scope.row.description" placement="top" effect="light" :disabled="!scope.row.description">
+            <span>{{ scope.row.description ? scope.row.description.substring(0, 20) + (scope.row.description.length > 20 ? '...' : '') : '无' }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column prop="stock" label="库存" width="100">
         <template slot-scope="scope">
           {{ scope.row.stock || 0 }}
@@ -54,8 +85,9 @@
       </el-table-column>
       <el-table-column label="操作" width="200">
         <template slot-scope="scope">
-          <el-button size="mini" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="mini" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button size="mini" @click="handleEdit(scope.row)" v-if="!isAdmin">编辑</el-button>
+          <el-button size="mini" type="danger" @click="handleDelete(scope.row)" v-if="!isAdmin">删除</el-button>
+          <el-button size="mini" @click="handleView(scope.row)" v-if="isAdmin">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -91,6 +123,19 @@
               :value="item.id">
             </el-option>
           </el-select>
+        </el-form-item>
+        <el-form-item label="商品图片">
+          <el-upload
+            class="avatar-uploader"
+            :action="uploadUrl"
+            :headers="uploadHeaders"
+            :show-file-list="false"
+            :on-success="handleImageSuccess"
+            :before-upload="beforeImageUpload">
+            <img v-if="form.image" :src="form.image" class="avatar">
+            <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+          </el-upload>
+          <div class="image-tip">建议上传尺寸: 300x300px, 大小不超过2MB</div>
         </el-form-item>
         <el-form-item label="价格" prop="price">
           <el-input-number v-model="form.price" :precision="2" :step="0.1" :min="0"></el-input-number>
@@ -137,6 +182,7 @@ export default {
   name: 'ProductList',
   data() {
     return {
+
       searchForm: {
         name: '',
         category: ''
@@ -148,6 +194,7 @@ export default {
       total: 0,
       dialogVisible: false,
       dialogTitle: '添加商品',
+
       form: {
         name: '',
         code: '',
@@ -156,14 +203,15 @@ export default {
         unit: '',
         specifications: '',
         description: '',
-        status: true
+        status: true,
+        image: ''
       },
       rules: {
         name: [{ required: true, message: '请输入商品名称', trigger: 'blur' }],
         code: [{ required: true, message: '请输入商品编码', trigger: 'blur' }],
         category: [{ required: true, message: '请选择商品分类', trigger: 'change' }],
         price: [{ required: true, message: '请输入价格', trigger: 'blur' }],
-        unit: [{ required: true, message: '请输入单位', trigger: 'blur' }]
+        unit: [{ required: true, message: '请输入原材料', trigger: 'blur' }]
       },
       categoryDialogVisible: false,
       categoryForm: {
@@ -179,7 +227,13 @@ export default {
         code: [
           { required: true, message: '请输入分类编码', trigger: 'blur' }
         ]
-      }
+      },
+      defaultImage: require('@/assets/img/bo.jpg'),
+      uploadUrl: this.$httpUrl + '/api/products/upload-image/',
+      uploadHeaders: {
+        Authorization: 'Bearer ' + localStorage.getItem('token')
+      },
+      isAdmin: JSON.parse(localStorage.getItem('userInfo') || '{}').role === 'admin'
     }
   },
   created() {
@@ -212,7 +266,8 @@ export default {
             id: p.id,
             name: p.name,
             stock: p.stock,
-            batches: p.batches
+            batches: p.batches,
+            image: p.image
           })))
           this.total = res.data.count
         })
@@ -250,7 +305,8 @@ export default {
         unit: '',
         specifications: '',
         description: '',
-        status: true
+        status: true,
+        image: ''
       }
       this.dialogVisible = true
     },
@@ -287,21 +343,61 @@ export default {
             ? `/api/products/${this.form.id}/`
             : '/api/products/list/'
           
-          const formData = {
-            ...this.form,
-            specifications: this.form.specifications || {},
-            status: this.form.status ? 'active' : 'inactive'
+          // 创建 FormData 对象来处理文件上传
+          const formData = new FormData()
+          
+          // 处理规格字段
+          let specifications = this.form.specifications
+          if (typeof specifications === 'string') {
+            try {
+              specifications = JSON.parse(specifications)
+            } catch (e) {
+              specifications = { description: specifications }
+            }
+          } else if (!specifications) {
+            specifications = {}
           }
           
-          this.$axios[method](this.$httpUrl + url, formData)
-            .then(() => {
+          // 添加所有字段到 FormData
+          formData.append('name', this.form.name)
+          formData.append('code', this.form.code)
+          formData.append('category', this.form.category)
+          formData.append('price', this.form.price)
+          formData.append('unit', this.form.unit)
+          formData.append('specifications', JSON.stringify(specifications))
+          formData.append('description', this.form.description || '')
+          formData.append('status', this.form.status ? 'active' : 'inactive')
+          
+          // 如果有新的图片文件，添加到 FormData
+          if (this.form.imageFile) {
+            formData.append('image', this.form.imageFile)
+          }
+          
+          // 设置请求配置
+          const config = {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          }
+          
+          console.log('Submitting form data:', {
+            name: this.form.name,
+            code: this.form.code,
+            category: this.form.category,
+            specifications: specifications,
+            image: this.form.imageFile ? 'File present' : 'No file'
+          })
+          
+          this.$axios[method](this.$httpUrl + url, formData, config)
+            .then(response => {
+              console.log('Submit response:', response)
               this.$message.success(this.form.id ? '更新成功' : '添加成功')
               this.dialogVisible = false
               this.fetchProducts()
             })
             .catch(err => {
+              console.error('Submit error:', err.response?.data || err)
               this.$message.error(err.response?.data?.error || (this.form.id ? '更新失败' : '添加失败'))
-              console.error(err)
             })
         }
       })
@@ -330,6 +426,44 @@ export default {
             })
         }
       })
+    },
+    // 图片上传相关方法
+    handleImageSuccess(res, file) {
+      if (res.image_url) {
+        this.form.image = res.image_url
+        this.form.imageFile = file.raw  // 保存文件对象以供后续提交
+        this.$message.success('图片上传成功')
+      } else {
+        this.$message.error('图片上传失败')
+      }
+    },
+    beforeImageUpload(file) {
+      const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
+      const isLt2M = file.size / 1024 / 1024 < 2
+
+      if (!isJPG) {
+        this.$message.error('上传图片只能是 JPG 或 PNG 格式!')
+      }
+      if (!isLt2M) {
+        this.$message.error('上传图片大小不能超过 2MB!')
+      }
+      
+      if (isJPG && isLt2M) {
+        // 保存文件对象
+        this.form.imageFile = file
+        return true
+      }
+      return false
+    },
+    formatSpecifications(specifications) {
+      if (typeof specifications === 'string') {
+        return specifications.replace(/\n/g, '<br>')
+      } else if (typeof specifications === 'object') {
+        return Object.entries(specifications).map(([key, value]) => {
+          return `<strong>${key}:</strong> ${value}`
+        }).join('<br>')
+      }
+      return '无'
     }
   }
 }
@@ -351,5 +485,42 @@ export default {
 .pagination-container {
   margin-top: 20px;
   text-align: right;
+}
+.avatar-uploader .el-upload {
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.avatar-uploader .el-upload:hover {
+  border-color: #409EFF;
+}
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 100px;
+  height: 100px;
+  line-height: 100px;
+  text-align: center;
+}
+.avatar {
+  width: 100px;
+  height: 100px;
+  display: block;
+  object-fit: cover;
+}
+.image-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
+}
+.image-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background: #f5f7fa;
 }
 </style> 

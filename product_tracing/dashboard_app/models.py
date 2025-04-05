@@ -49,7 +49,7 @@ class Warning(models.Model):
 
 class DashboardSetting(models.Model):
     """仪表盘设置"""
-    key = models.CharField('键', max_length=50, unique=True)
+    setting_key = models.CharField('键', max_length=50, unique=True)
     value = models.JSONField('值')
     description = models.CharField('描述', max_length=200, blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
@@ -61,7 +61,7 @@ class DashboardSetting(models.Model):
         db_table = 'dashboard_setting'
 
     def __str__(self):
-        return self.key
+        return self.setting_key
 
 
 class Notification(models.Model):

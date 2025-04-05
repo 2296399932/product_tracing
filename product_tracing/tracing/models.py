@@ -2,21 +2,23 @@ from django.db import models
 from products.models import Batch, Product
 from users.models import User
 
+import json
+
 class ProductionRecord(models.Model):
     """生产记录"""
-    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, 
-                             related_name='production_records', verbose_name='商品批次')
-    raw_materials = models.JSONField(verbose_name='原材料信息')
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE,
+                              verbose_name='商品批次',
+                              related_name='production_records')
     production_date = models.DateTimeField(
         verbose_name='生产时间',
-        db_index=True  # 添加索引
+        db_index=True
     )
     operator = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='操作员')
     quality_check = models.JSONField(verbose_name='质检信息')
     production_line = models.CharField(max_length=50, verbose_name='生产线')
-    temperature = models.DecimalField(max_digits=5, decimal_places=2, 
+    temperature = models.DecimalField(max_digits=5, decimal_places=2,
                                     null=True, blank=True, verbose_name='生产温度')
-    humidity = models.DecimalField(max_digits=5, decimal_places=2, 
+    humidity = models.DecimalField(max_digits=5, decimal_places=2,
                                  null=True, blank=True, verbose_name='生产环境湿度')
     remark = models.TextField(blank=True, null=True, verbose_name='备注')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
@@ -38,8 +40,8 @@ class LogisticsRecord(models.Model):
         ('processing', '处理中'),
         ('completed', '已完成')
     )
-    
-    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, 
+
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE,
                              related_name='logistics_records')
     record_type = models.CharField(max_length=20, choices=RECORD_TYPE_CHOICES)
     from_location = models.CharField(max_length=100)

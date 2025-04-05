@@ -3,13 +3,16 @@ import VueRouter from 'vue-router'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Layout from '@/layout/Layout.vue'
+import TraceDetail from '@/views/TraceDetail.vue'
 
 Vue.use(VueRouter)
 
 const routes = [
   {
-    path: '/',
-    redirect: '/dashboard'
+    path: '/trace/:batchNumber',
+    name: 'TraceDetail',
+    component: TraceDetail,
+    meta: { requiresAuth: false }
   },
   {
     path: '/login',
@@ -27,6 +30,10 @@ const routes = [
     path: '/',
     component: Layout,
     children: [
+      {
+        path: '',  // 添加默认子路由
+        redirect: 'dashboard'
+      },
       // 仪表盘
       {
         path: 'dashboard',
@@ -50,6 +57,39 @@ const routes = [
         name: 'Batches',
         component: () => import('@/views/products/Batches.vue'),
         meta: { requiresAuth: true, title: '批次管理' }
+      },
+      
+      // 原材料管理
+      {
+        path: 'materials',
+        name: 'Materials',
+        component: () => import('@/views/materials/MaterialList'),
+        meta: { requiresAuth: true, title: '原材料管理' }
+      },
+      {
+        path: 'materials/batches',
+        name: 'MaterialBatches',
+        component: () => import('@/views/materials/MaterialBatches'),
+        meta: { requiresAuth: true, title: '原材料批次' }
+      },
+      {
+        path: 'materials/suppliers',
+        name: 'SupplierList',
+        component: () => import('@/views/materials/SupplierList'),
+        meta: { requiresAuth: true, title: '供应商管理' }
+      },
+
+      // 产品原材料配方路由
+      {
+        path: 'products/detail/:id/materials',
+        name: 'ProductMaterials',
+        component: () => import('@/views/products/ProductMaterials'),
+        meta: { 
+          requiresAuth: true, 
+          title: '原材料配方',
+          activeMenu: '/products/list'
+        },
+        hidden: true
       },
 
       // 追溯管理
@@ -85,7 +125,7 @@ const routes = [
         path: 'analysis',
         name: 'Analysis',
         component: () => import('@/views/analysis/Analysis.vue'),
-        meta: { requiresAuth: true, title: '数据分析' }
+        meta: { requiresAuth: true, title: '数据概览' }
       },
 
       // 系统管理
@@ -143,29 +183,76 @@ const routes = [
         meta: { requiresAuth: true, title: '个人中心' }
       }
     ]
+  },
+  {
+    path: '*',
+    redirect: '/login'
   }
 ]
 
 const router = new VueRouter({
+  mode: 'hash',
   routes
 })
 
 router.beforeEach((to, from, next) => {
+  console.log('Route check:', {
+    path: to.path,
+    name: to.name,
+    matched: to.matched.map(r => r.path),
+    params: to.params,
+    fullPath: to.fullPath,
+    hash: to.hash
+  })
+
+  // 公开路由，不需要登录
+  if (to.path.startsWith('/trace/') || to.name === 'TraceDetail' || 
+      to.path === '/login' || to.path === '/register') {
+    console.log('Public route detected, allowing access without auth')
+    next()
+    return
+  }
+
   const token = localStorage.getItem('token')
   
-  if (to.meta.requiresAuth === false) {
-    // 登录和注册页面不需要验证
-    if (token && (to.path === '/login' || to.path === '/register')) {
-      next('/')
-    } else {
-      next()
-    }
-  } else {
-    if (token) {
-      next()
-    } else {
-      next('/login')
-    }
+  // 未登录，跳转到登录页
+  if (!token) {
+    next('/login')
+    return
+  }
+  
+  // 已登录，检查权限
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const isAdmin = userInfo.role === 'admin'
+  
+  // 管理员路由
+  const adminRoutes = ['/system/users','/dashboard', '/products', '/products/batches', 
+    '/tracing/production', '/tracing/logistics', '/tracing/sales',
+    '/trace', '/analysis', '/profile',
+    // 添加原材料相关路由
+    '/materials', '/materials/batches', '/materials/suppliers']
+  // 普通用户路由
+  const userRoutes = ['/dashboard', '/products', '/products/batches', 
+    '/tracing/production', '/tracing/logistics', '/tracing/sales',
+    '/trace', '/analysis', '/profile',
+    // 添加原材料相关路由
+    '/materials', '/materials/batches', '/materials/suppliers']
+  
+  // 管理员访问管理员路由
+  if (isAdmin && (adminRoutes.includes(to.path) || adminRoutes.some(route => to.path.startsWith(route)))) {
+    next()
+  }
+  // 普通用户访问普通用户路由
+  else if (!isAdmin && (userRoutes.includes(to.path) || userRoutes.some(route => to.path.startsWith(route)))) {
+    next()
+  }
+  // 根路径重定向
+  else if (to.path === '/') {
+    next(isAdmin ? '/system/users' : '/dashboard')
+  }
+  // 无权限访问
+  else {
+    next(isAdmin ? '/system/users' : '/dashboard')
   }
 })
 
@@ -185,4 +272,12 @@ router.beforeEach((to, from, next) => {
 //         next();
 //     }
 // });
+
+console.log('TraceDetail component loaded:', TraceDetail)
+
+// 添加路由错误处理
+router.onError((error) => {
+  console.error('Router error:', error)
+})
+
 export default router

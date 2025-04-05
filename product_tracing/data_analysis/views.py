@@ -15,6 +15,8 @@ from django.http import HttpResponse
 import xlsxwriter
 from io import BytesIO
 from django.db import models
+from django.db.models import Q
+from django.db.models import F
 
 class SalesStatisticsView(APIView):
     """销售统计视图"""
@@ -501,3 +503,613 @@ class AnalysisExportView(APIView):
             worksheet.write(row, 2, data['scan_count'])
             worksheet.write(row, 3, data['query_count'])
             worksheet.write(row, 4, data['region'])
+
+class SalesOverviewView(APIView):
+    """销售概览数据"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 获取查询参数
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
+            category = request.query_params.get('category')
+            
+            # 构建基础查询
+            queryset = SalesRecord.objects.all()
+            
+            # 添加过滤条件
+            if date_from:
+                queryset = queryset.filter(sale_date__gte=date_from)
+            if date_to:
+                queryset = queryset.filter(sale_date__lte=date_to)
+            if category:
+                queryset = queryset.filter(batch__product__category_id=category)
+
+            # 获取销售趋势数据
+            trend_data = queryset.annotate(
+                date=TruncDate('sale_date')
+            ).values('date').annotate(
+                amount=Sum('total_amount'),
+                count=Count('id')
+            ).order_by('date')
+
+            # 计算销售概览数据
+            total_amount = queryset.aggregate(total=Sum('total_amount'))['total'] or 0
+
+            overview = {
+                'total_amount': float(total_amount),
+                'order_count': queryset.count(),
+                'product_count': queryset.values('batch__product').distinct().count(),
+                'customer_count': queryset.values('customer_name').distinct().count(),
+                'growth': 0,  # 默认增长率为0
+                'trends': {
+                    'dates': [item['date'].strftime('%Y-%m-%d') for item in trend_data],
+                    'amount': [float(item['amount']) for item in trend_data],
+                    'count': [item['count'] for item in trend_data]
+                }
+            }
+            
+            # 计算同比增长
+            if date_from:
+                try:
+                    date_from = datetime.strptime(date_from, '%Y-%m-%d')
+                    last_period = queryset.filter(
+                        sale_date__lt=date_from,
+                        sale_date__gte=date_from - timedelta(days=30)
+                    )
+                    last_amount = last_period.aggregate(total=Sum('total_amount'))['total'] or 0
+                    if last_amount > 0:
+                        overview['growth'] = ((total_amount - last_amount) / last_amount * 100)
+                except (ValueError, TypeError):
+                    pass  # 如果日期格式错误，保持默认增长率为0
+
+            print("Overview data:", overview)  # 添加调试输出
+            return Response(overview)
+            
+        except Exception as e:
+            import traceback
+            print("Error in SalesOverviewView:", str(e))
+            print(traceback.format_exc())
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class TracingOverviewView(APIView):
+    """追溯概览数据"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 获取查询参数
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
+            category = request.query_params.get('category')
+            
+            # 构建基础查询
+            batches = Batch.objects.all()
+            
+            # 添加过滤条件
+            if date_from:
+                batches = batches.filter(created_at__gte=date_from)
+            if date_to:
+                batches = batches.filter(created_at__lte=date_to)
+            if category:
+                batches = batches.filter(product__category_id=category)
+
+            # 计算追溯概览数据
+            overview = {
+                'total_batches': batches.count(),
+                'complete_chain': batches.filter(
+                    production_records__isnull=False,
+                    logistics_records__isnull=False,
+                    sales_records__isnull=False
+                ).distinct().count(),
+                'scan_count': batches.aggregate(
+                    total=Sum('tracing_statistics__scan_count')
+                )['total'] or 0,
+                'query_count': batches.aggregate(
+                    total=Sum('tracing_statistics__query_count')
+                )['total'] or 0
+            }
+            
+            # 计算完整率
+            overview['completion_rate'] = (
+                overview['complete_chain'] / overview['total_batches'] * 100
+                if overview['total_batches'] > 0 else 0
+            )
+
+            # 添加商品销售排行数据
+            top_products = SalesRecord.objects.values(
+                'batch__product__name'
+            ).annotate(
+                total_amount=Sum('total_amount'),
+                total_count=Count('id')
+            ).order_by('-total_amount')[:5]  # 获取销售额前5的商品
+
+            # 添加销售分类占比数据
+            category_sales = SalesRecord.objects.values(
+                'batch__product__category__name'
+            ).annotate(
+                total_amount=Sum('total_amount')
+            ).order_by('-total_amount')
+
+            # 更新返回数据
+            overview.update({
+                'top_products': [
+                    {
+                        'name': item['batch__product__name'],
+                        'value': float(item['total_amount']),
+                        'count': item['total_count']
+                    } for item in top_products
+                ],
+                'category_sales': [
+                    {
+                        'name': item['batch__product__category__name'],
+                        'value': float(item['total_amount'])
+                    } for item in category_sales
+                ]
+            })
+
+            return Response(overview)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class QualityOverviewView(APIView):
+    """质量概览数据"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 获取查询参数
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
+            category = request.query_params.get('category')
+            
+            # 构建基础查询
+            records = ProductionRecord.objects.all()
+            
+            # 添加过滤条件
+            if date_from:
+                records = records.filter(production_date__gte=date_from)
+            if date_to:
+                records = records.filter(production_date__lte=date_to)
+            if category:
+                records = records.filter(batch__product__category_id=category)
+
+            # 计算质量概览数据
+            total_records = records.count()
+            passed_records = records.filter(
+                quality_check__contains=[{'result': 'pass'}]
+            ).count()
+            
+            overview = {
+                'total_inspections': total_records,
+                'passed_count': passed_records,
+                'issue_count': total_records - passed_records,
+                'pass_rate': (passed_records / total_records * 100) if total_records > 0 else 0,
+                'avg_process_time': records.filter(
+                    quality_check__0__result='failed'
+                ).aggregate(
+                    avg_time=Avg('quality_check__0__process_time')
+                )['avg_time'] or 0
+            }
+
+            # 添加趋势数据
+            trend_data = records.annotate(
+                date=TruncDate('production_date')
+            ).values('date').annotate(
+                total=Count('id'),
+                passed=Count('id', filter=Q(quality_check__contains=[{'result': 'pass'}]))
+            ).order_by('date')
+
+            # 添加问题类型分布
+            issue_types = records.filter(
+                quality_check__0__result='failed'
+            ).values(
+                'quality_check__0__issue_type'
+            ).annotate(
+                count=Count('id')
+            ).order_by('-count')
+
+            # 添加原因分析
+            causes = records.filter(
+                quality_check__0__result='failed'
+            ).values(
+                'quality_check__0__cause'
+            ).annotate(
+                count=Count('id')
+            ).order_by('-count')
+
+            overview.update({
+                'trend': {
+                    'pass_rates': [
+                        (item['passed'] / item['total'] * 100) if item['total'] > 0 else 0
+                        for item in trend_data
+                    ],
+                    'issue_counts': [
+                        item['total'] - item['passed']
+                        for item in trend_data
+                    ]
+                },
+                'issueTypes': [
+                    {
+                        'name': item['quality_check__0__issue_type'] or '未分类',
+                        'count': item['count']
+                    }
+                    for item in issue_types
+                ],
+                'causes': [
+                    {
+                        'name': item['quality_check__0__cause'] or '未知原因',
+                        'value': item['count']
+                    }
+                    for item in causes
+                ]
+            })
+
+            return Response(overview)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class SalesDetailsView(APIView):
+    """销售明细数据"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 获取查询参数
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
+            category = request.query_params.get('category')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            
+            # 构建基础查询
+            queryset = SalesRecord.objects.select_related(
+                'batch', 'batch__product', 'batch__product__category'
+            ).all()
+            
+            # 添加过滤条件
+            if date_from:
+                queryset = queryset.filter(sale_date__gte=date_from)
+            if date_to:
+                queryset = queryset.filter(sale_date__lte=date_to)
+            if category:
+                queryset = queryset.filter(batch__product__category_id=category)
+
+            # 分页
+            total = queryset.count()
+            start = (page - 1) * page_size
+            end = start + page_size
+            records = queryset[start:end]
+
+            # 格式化数据
+            data = {
+                'count': total,
+                'results': [{
+                    'id': record.id,
+                    'date': record.sale_date,
+                    'product_name': record.batch.product.name,
+                    'category_name': record.batch.product.category.name,
+                    'batch_number': record.batch.batch_number,
+                    'quantity': record.quantity,
+                    'unit_price': float(record.unit_price),
+                    'total_amount': float(record.total_amount),
+                    'customer_name': record.customer_name
+                } for record in records]
+            }
+
+            return Response(data)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class TracingIssuesView(APIView):
+    """追溯问题数据"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 获取查询参数
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
+            category = request.query_params.get('category')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            
+            # 构建基础查询
+            batches = Batch.objects.select_related(
+                'product', 'product__category'
+            ).filter(
+                production_records__isnull=True,
+                logistics_records__isnull=True,
+                sales_records__isnull=True
+            ).distinct()
+            
+            # 添加过滤条件
+            if date_from:
+                batches = batches.filter(created_at__gte=date_from)
+            if date_to:
+                batches = batches.filter(created_at__lte=date_to)
+            if category:
+                batches = batches.filter(product__category_id=category)
+
+            # 分页
+            total = batches.count()
+            start = (page - 1) * page_size
+            end = start + page_size
+            records = batches[start:end]
+
+            # 格式化数据
+            data = {
+                'count': total,
+                'results': [{
+                    'id': batch.id,
+                    'batch_number': batch.batch_number,
+                    'product_name': batch.product.name,
+                    'category_name': batch.product.category.name,
+                    'created_at': batch.created_at,
+                    'missing_records': {
+                        'production': batch.production_records.exists(),
+                        'logistics': batch.logistics_records.exists(),
+                        'sales': batch.sales_records.exists()
+                    }
+                } for batch in records]
+            }
+
+            return Response(data)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class QualityIssuesView(APIView):
+    """质量问题数据"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 获取查询参数
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
+            category = request.query_params.get('category')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            
+            # 构建基础查询
+            records = ProductionRecord.objects.select_related(
+                'batch', 'batch__product', 'operator'
+            ).filter(
+                quality_check__0__result='failed'
+            )
+            
+            # 添加过滤条件
+            if date_from:
+                records = records.filter(production_date__gte=date_from)
+            if date_to:
+                records = records.filter(production_date__lte=date_to)
+            if category:
+                records = records.filter(batch__product__category_id=category)
+
+            # 分页
+            total = records.count()
+            start = (page - 1) * page_size
+            end = start + page_size
+            records = records[start:end]
+
+            # 格式化数据
+            data = {
+                'count': total,
+                'results': [{
+                    'id': record.id,
+                    'batch_number': record.batch.batch_number,
+                    'product_name': record.batch.product.name,
+                    'production_date': record.production_date,
+                    'operator_name': record.operator.username,
+                    'issue_type': record.quality_check[0].get('issue_type'),
+                    'description': record.quality_check[0].get('description'),
+                    'severity': record.quality_check[0].get('severity'),
+                    'status': record.quality_check[0].get('status')
+                } for record in records]
+            }
+
+            return Response(data)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class SalesExportView(APIView):
+    """销售数据导出"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 创建工作簿
+            output = BytesIO()
+            workbook = xlsxwriter.Workbook(output)
+            worksheet = workbook.add_worksheet('销售明细')
+            
+            # 设置表头样式
+            header_format = workbook.add_format({
+                'bold': True,
+                'align': 'center',
+                'valign': 'vcenter',
+                'border': 1
+            })
+            
+            # 写入表头
+            headers = ['日期', '商品名称', '分类', '批次号', '数量', '单价', '金额', '客户名称']
+            for col, header in enumerate(headers):
+                worksheet.write(0, col, header, header_format)
+            
+            # 获取数据
+            queryset = SalesRecord.objects.select_related(
+                'batch', 'batch__product', 'batch__product__category'
+            ).all()
+            
+            # 写入数据
+            for row, record in enumerate(queryset, 1):
+                worksheet.write(row, 0, record.sale_date.strftime('%Y-%m-%d %H:%M:%S'))
+                worksheet.write(row, 1, record.batch.product.name)
+                worksheet.write(row, 2, record.batch.product.category.name)
+                worksheet.write(row, 3, record.batch.batch_number)
+                worksheet.write(row, 4, record.quantity)
+                worksheet.write(row, 5, float(record.unit_price))
+                worksheet.write(row, 6, float(record.total_amount))
+                worksheet.write(row, 7, record.customer_name)
+            
+            workbook.close()
+            
+            # 返回Excel文件
+            output.seek(0)
+            response = HttpResponse(
+                output.read(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename=sales_report.xlsx'
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class TracingExportView(APIView):
+    """追溯数据导出"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 创建工作簿
+            output = BytesIO()
+            workbook = xlsxwriter.Workbook(output)
+            worksheet = workbook.add_worksheet('追溯问题')
+            
+            # 设置表头样式
+            header_format = workbook.add_format({
+                'bold': True,
+                'align': 'center',
+                'valign': 'vcenter',
+                'border': 1
+            })
+            
+            # 写入表头
+            headers = ['批次号', '商品名称', '创建时间', '缺失生产记录', '缺失物流记录', '缺失销售记录']
+            for col, header in enumerate(headers):
+                worksheet.write(0, col, header, header_format)
+            
+            # 获取数据
+            batches = Batch.objects.select_related(
+                'product'
+            ).filter(
+                production_records__isnull=True,
+                logistics_records__isnull=True,
+                sales_records__isnull=True
+            ).distinct()
+            
+            # 写入数据
+            for row, batch in enumerate(batches, 1):
+                worksheet.write(row, 0, batch.batch_number)
+                worksheet.write(row, 1, batch.product.name)
+                worksheet.write(row, 2, batch.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+                worksheet.write(row, 3, '是' if not batch.production_records.exists() else '否')
+                worksheet.write(row, 4, '是' if not batch.logistics_records.exists() else '否')
+                worksheet.write(row, 5, '是' if not batch.sales_records.exists() else '否')
+            
+            workbook.close()
+            
+            # 返回Excel文件
+            output.seek(0)
+            response = HttpResponse(
+                output.read(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename=tracing_report.xlsx'
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class QualityExportView(APIView):
+    """质量数据导出"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # 创建工作簿
+            output = BytesIO()
+            workbook = xlsxwriter.Workbook(output)
+            worksheet = workbook.add_worksheet('质量问题')
+            
+            # 设置表头样式
+            header_format = workbook.add_format({
+                'bold': True,
+                'align': 'center',
+                'valign': 'vcenter',
+                'border': 1
+            })
+            
+            # 写入表头
+            headers = ['批次号', '商品名称', '生产日期', '操作员', '问题类型', '问题描述', '严重程度', '状态']
+            for col, header in enumerate(headers):
+                worksheet.write(0, col, header, header_format)
+            
+            # 获取数据
+            records = ProductionRecord.objects.select_related(
+                'batch', 'batch__product', 'operator'
+            ).filter(
+                quality_check__0__result='failed'
+            )
+            
+            # 写入数据
+            for row, record in enumerate(records, 1):
+                worksheet.write(row, 0, record.batch.batch_number)
+                worksheet.write(row, 1, record.batch.product.name)
+                worksheet.write(row, 2, record.production_date.strftime('%Y-%m-%d %H:%M:%S'))
+                worksheet.write(row, 3, record.operator.username)
+                worksheet.write(row, 4, record.quality_check[0].get('issue_type', ''))
+                worksheet.write(row, 5, record.quality_check[0].get('description', ''))
+                worksheet.write(row, 6, record.quality_check[0].get('severity', ''))
+                worksheet.write(row, 7, record.quality_check[0].get('status', ''))
+            
+            workbook.close()
+            
+            # 返回Excel文件
+            output.seek(0)
+            response = HttpResponse(
+                output.read(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename=quality_report.xlsx'
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

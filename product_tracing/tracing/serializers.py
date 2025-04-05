@@ -1,43 +1,22 @@
 from rest_framework import serializers
 from .models import ProductionRecord, LogisticsRecord, SalesRecord
 from products.serializers import BatchSerializer
-from users.serializers import UserSerializer
 
 class ProductionRecordSerializer(serializers.ModelSerializer):
     operator_name = serializers.CharField(source='operator.username', read_only=True)
     batch_number = serializers.CharField(source='batch.batch_number', read_only=True)
-    batch_details = serializers.SerializerMethodField()
+    batch_details = BatchSerializer(source='batch', read_only=True)
     
     class Meta:
         model = ProductionRecord
         fields = [
-            'id', 'batch', 'batch_details', 'batch_number',
-            'production_date', 'production_line', 
+            'id', 'batch', 'batch_number', 'batch_details',
+            'production_date', 'production_line',
             'operator', 'operator_name',
             'temperature', 'humidity',
-            'raw_materials', 'quality_check',
-            'remark', 'created_at'
+            'quality_check', 'remark', 'created_at'
         ]
         read_only_fields = ['operator', 'created_at']
-    
-    def get_batch_details(self, obj):
-        try:
-            return {
-                'id': obj.batch.id,
-                'batch_number': obj.batch.batch_number,
-                'product': {
-                    'id': obj.batch.product.id,
-                    'name': obj.batch.product.name
-                }
-            } if obj.batch else None
-        except Exception as e:
-            print(f"Error getting batch details: {e}")
-            return None
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        print(f"Serialized data for record {instance.id}:", data)
-        return data
 
 class LogisticsRecordSerializer(serializers.ModelSerializer):
     operator_name = serializers.CharField(source='operator.username', read_only=True)
@@ -123,6 +102,7 @@ class TraceSerializer(serializers.Serializer):
     production_records = serializers.SerializerMethodField()
     logistics_records = serializers.SerializerMethodField()
     sales_record = serializers.SerializerMethodField()
+    materials = serializers.SerializerMethodField()
 
     def get_product(self, obj):
         return {
@@ -131,6 +111,38 @@ class TraceSerializer(serializers.Serializer):
             'code': obj.product.code,
             'manufacturer_name': obj.product.manufacturer.username
         }
+
+    def get_materials(self, obj):
+        try:
+            # 添加调试日志
+            print(f"Getting materials for batch {obj.batch_number}")
+            print(f"Product: {obj.product.name}")
+            print(f"Product materials count: {obj.product.product_materials.count()}")
+            
+            materials = []
+            for pm in obj.product.product_materials.all():
+                try:
+                    material_batch = pm.material_batch
+                    print(f"Processing material batch: {material_batch.batch_number}")
+                    
+                    materials.append({
+                        'name': material_batch.material.name,
+                        'code': material_batch.material.code,
+                        'batch_number': material_batch.batch_number,
+                        'quantity': str(pm.quantity),
+                        'unit': pm.unit,
+                        'supplier': material_batch.supplier.name if material_batch.supplier else None,
+                        'production_date': material_batch.production_date,
+                        'expiry_date': material_batch.expiry_date
+                    })
+                except Exception as e:
+                    print(f"Error processing material: {str(e)}")
+                    continue
+                
+            return materials
+        except Exception as e:
+            print(f"Error in get_materials: {str(e)}")
+            return []
 
     def get_production_records(self, obj):
         return [{

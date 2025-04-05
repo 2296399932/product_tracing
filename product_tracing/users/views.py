@@ -2,22 +2,24 @@ from django.shortcuts import render
 from rest_framework import status, generics, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, login
 from .models import User
-from .serializers import UserSerializer, UserRegisterSerializer, UserLoginSerializer
+from .serializers import UserSerializer, UserRegisterSerializer, UserLoginSerializer, UserProfileSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import serializers
 from rest_framework.pagination import PageNumberPagination
 import traceback
 from django.core.exceptions import ValidationError
+from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-        print("Login request data:", request.data)  # 添加请求数据日志
+        print("Login request data:", request.data)
         username = request.data.get('username')
         password = request.data.get('password')
         
@@ -25,11 +27,11 @@ class LoginView(APIView):
         
         if user is not None:
             login(request, user)
+            # 使用 JWT token
             refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
             
             response_data = {
-                'token': access_token,
+                'token': str(refresh.access_token),  # 使用 JWT token
                 'user': {
                     'id': user.id,
                     'username': user.username,
@@ -40,7 +42,7 @@ class LoginView(APIView):
                     'last_login': user.last_login
                 }
             }
-            print("Login response data:", response_data)  # 添加响应数据日志
+            print("Login response data:", response_data)
             
             return Response(response_data)
         else:
@@ -87,7 +89,7 @@ class UserRegisterView(APIView):
                         errors.append(f"{field}: {error}")
                 else:
                     errors.append(f"{field}: {field_errors}")
-            
+            a
             return Response({
                 'message': '注册失败',
                 'errors': errors
@@ -296,34 +298,44 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         obj = super().get_object()
         return obj
 
-class UserProfileView(generics.RetrieveUpdateAPIView):
-    """当前用户信息视图"""
-    serializer_class = UserSerializer
-    authentication_classes = []
-    permission_classes = []
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
     
-    def get_object(self):
-        return self.request.user
+    def get(self, request):
+        print('=== Profile Request ===')
+        print('Headers:', request.headers)
+        print('User:', request.user)
+        print('Auth:', request.auth)
+        
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
 
 class ChangePasswordView(APIView):
     """修改密码视图"""
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
         
+        # 确保用户已认证
+        if not request.user.is_authenticated:
+            return Response({'error': '用户未认证'}, status=status.HTTP_401_UNAUTHORIZED)
+            
         # 验证旧密码
         if not request.user.check_password(old_password):
-            return Response({
-                'error': '原密码不正确'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response({'error': '原密码不正确'}, status=status.HTTP_400_BAD_REQUEST)
+            
         # 设置新密码
         request.user.set_password(new_password)
         request.user.save()
         
-        return Response({
-            'message': '密码修改成功'
-        })
+        return Response({'message': '密码修改成功'})

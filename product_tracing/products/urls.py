@@ -16,6 +16,10 @@ urlpatterns = [
     # 批次管理
     path('batches/', views.BatchListCreateView.as_view(), name='batch-list'),
     path('batches/<int:pk>/', views.BatchDetailView.as_view()),
-    path('qrcode/<str:batch_number>/', views.generate_qrcode, name='batch-qrcode'),
-    path('qrcode/<str:batch_number>/generate/', views.generate_qrcode, name='generate_qrcode'),
+    path('batches/<int:pk>/materials/', views.BatchMaterialsView.as_view(), name='batch-materials'),
+    # path('qrcode/<str:batch_number>/', views.generate_qrcode, name='batch-qrcode'),
+    # path('qrcode/<str:batch_number>/generate/', views.generate_qrcode, name='generate_qrcode'),
+
+    # 图片上传
+    path('upload-image/', views.ProductImageUploadView.as_view(), name='product-image-upload'),
 ]

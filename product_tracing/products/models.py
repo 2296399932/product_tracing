@@ -81,8 +81,7 @@ class Batch(models.Model):
         choices=STATUS_CHOICES,
         default='active'
     )
-    qr_code = models.ImageField(upload_to='qrcodes/', blank=True, null=True, 
-                               verbose_name='追溯码')
+    qr_code = models.ImageField(upload_to='qrcodes/', null=True, blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
@@ -100,6 +99,11 @@ class Batch(models.Model):
     def __str__(self):
         return self.batch_number
 
+    def delete(self, *args, **kwargs):
+        # 跳过关联删除
+        kwargs['keep_parents'] = True
+        super().delete(*args, **kwargs)
+
 class Inventory(models.Model):
     """库存模型"""
     LOCATION_CHOICES = (
@@ -111,7 +115,7 @@ class Inventory(models.Model):
     batch = models.OneToOneField(Batch, on_delete=models.CASCADE, 
                                 related_name='inventory_info', verbose_name='批次')
     quantity = models.IntegerField('数量')
-    location = models.CharField('库存位置', max_length=20, 
+    location = models.CharField('库存类型', max_length=20, 
                               choices=LOCATION_CHOICES, default='warehouse')
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
@@ -122,28 +126,6 @@ class Inventory(models.Model):
 
     def __str__(self):
         return f"{self.batch.batch_number}-{self.get_location_display()}"
-
-class Warehouse(models.Model):
-    """仓库"""
-    name = models.CharField(max_length=100, unique=True, verbose_name='仓库名称')
-    address = models.CharField(max_length=200, verbose_name='地址')
-    manager = models.ForeignKey(User, on_delete=models.SET_NULL, 
-                              null=True, verbose_name='仓库管理员')
-    phone = models.CharField(max_length=20, verbose_name='联系电话')
-    area = models.DecimalField(max_digits=10, decimal_places=2, 
-                             verbose_name='面积(平方米)')
-    status = models.BooleanField(default=True, verbose_name='是否启用')
-    remark = models.TextField(blank=True, null=True, verbose_name='备注')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
-
-    class Meta:
-        verbose_name = '仓库'
-        verbose_name_plural = verbose_name
-        db_table = 'warehouse'
-
-    def __str__(self):
-        return self.name
 
 # 添加库存记录模型，用于记录出入库历史
 class InventoryRecord(models.Model):
@@ -176,3 +158,22 @@ class InventoryRecord(models.Model):
             self.inventory.quantity -= self.quantity
         self.inventory.save()
         super().save(*args, **kwargs)
+
+class ProductMaterial(models.Model):
+    """产品原材料关联模型"""
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, 
+                               related_name='product_materials', verbose_name='产品')
+    material_batch = models.ForeignKey('materials.MaterialBatch', on_delete=models.CASCADE,
+                                      related_name='used_in_products', verbose_name='原材料批次')
+    quantity = models.DecimalField('使用数量', max_digits=10, decimal_places=2)
+    unit = models.CharField('单位', max_length=20)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    class Meta:
+        verbose_name = '产品原材料'
+        verbose_name_plural = verbose_name
+        db_table = 'product_material'
+        unique_together = ['product', 'material_batch']
+
+    def __str__(self):
+        return f"{self.product.name} - {self.material_batch.material.name}"

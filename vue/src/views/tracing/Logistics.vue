@@ -2,7 +2,7 @@
   <div class="logistics-container">
     <div class="page-header">
       <h2>物流记录管理</h2>
-      <el-button type="primary" @click="handleAdd">添加物流记录</el-button>
+      <el-button type="primary" @click="handleAdd" v-if="!isAdmin">添加物流记录</el-button>
     </div>
 
     <!-- 搜索栏 -->
@@ -62,7 +62,7 @@
       <!-- 规格 -->
       <el-table-column label="规格" width="120">
         <template slot-scope="scope">
-          {{ scope.row.batch_details?.specifications }}
+          {{ scope.row.batch_details?.specifications. description}}
         </template>
       </el-table-column>
 
@@ -115,13 +115,13 @@
         <template slot-scope="scope">
           <el-button 
             size="mini" 
-            @click.stop="handleEdit(scope.row)">
+            @click.stop="handleEdit(scope.row)" v-if="!isAdmin">
             编辑
           </el-button>
           <el-button 
             size="mini" 
             type="danger" 
-            @click.stop="handleDelete(scope.row)">
+            @click.stop="handleDelete(scope.row)" v-if="!isAdmin">
             删除
           </el-button>
         </template>
@@ -231,6 +231,8 @@ export default {
   },
   data() {
     return {
+         isAdmin: JSON.parse(localStorage.getItem('userInfo') || '{}').role === 'admin',
+
       searchForm: {
         batch: '',
         record_type: '',

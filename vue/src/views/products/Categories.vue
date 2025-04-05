@@ -2,7 +2,7 @@
   <div class="categories-container">
     <div class="page-header">
       <h2>商品分类管理</h2>
-      <el-button type="primary" @click="handleAdd">添加分类</el-button>
+      <el-button type="primary" @click="handleAdd" v-if="!isAdmin">添加分类</el-button>
     </div>
     
     <el-table :data="categories" border style="width: 100%">
@@ -19,8 +19,8 @@
       </el-table-column>
       <el-table-column label="操作" width="200">
         <template slot-scope="scope">
-          <el-button size="mini" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="mini" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button size="mini" @click="handleEdit(scope.row) " v-if="!isAdmin">编辑</el-button>
+          <el-button size="mini" type="danger" @click="handleDelete(scope.row) " v-if="!isAdmin">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -65,6 +65,7 @@ export default {
   data() {
     return {
       categories: [],
+         isAdmin: JSON.parse(localStorage.getItem('userInfo') || '{}').role === 'admin',
       dialogVisible: false,
       dialogTitle: '添加分类',
       form: {

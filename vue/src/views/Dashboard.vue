@@ -42,7 +42,7 @@
             </div>
             <div class="data-info">
               <div class="data-title">本月销售额</div>
-              <div class="data-value">¥{{ overview.total_sales }}</div>
+              <div class="data-value">{{ overview.total_sales }}单</div>
               <div class="data-compare" :class="overview.salesGrowth > 0 ? 'up' : 'down'">
                 {{ Math.abs(overview.salesGrowth) }}% 较上月
               </div>

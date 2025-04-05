@@ -1,7 +1,7 @@
 <template>
   <div class="login-container">
     <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
-      <h3 class="title">商品追溯系统</h3>
+      <h3 class="title">食品安全追溯系统</h3>
       <el-form-item prop="username">
         <el-input v-model="loginForm.username" placeholder="用户名" />
       </el-form-item>
@@ -56,7 +56,12 @@ export default {
               localStorage.setItem('userInfo', JSON.stringify(response.data.user))
               
               this.$message.success('登录成功')
+              if (response.data.user.role === 'admin') {
+                this.$router.push('/system/users')
+              }
+              else {
               this.$router.push('/')
+              }
             } else {
               this.$message.error('登录失败：响应格式错误')
               console.error('Invalid login response:', response)

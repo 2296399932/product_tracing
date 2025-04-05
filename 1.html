@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>百度登录</title>
+    <style>
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        
+        .login-container {
+            display: flex;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            width: 650px;
+            height: 380px;
+            position: relative;
+        }
+        
+        .qrcode-section {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .form-section {
+            width: 50%;
+            padding: 20px;
+            position: relative;
+            border-left: 1px solid #f0f0f0;
+        }
+        
+        .baidu-logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 120px;
+        }
+        
+        .close-btn {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            font-size: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .scan-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 30px 0 15px;
+            margin-top: 70px;
+    position: relative;
+    width: 100%;
+}
+
+.qrcode {
+    width: 120px;
+    height: 120px;
+    margin-right: 20px;
+}
+
+.qrcode img {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #f0f0f0;
+    object-fit: contain;
+}
+
+.app-icon {
+    width: 120px;
+    height: 120px;
+}
+
+.app-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.social-icon {
+    width: 100px;
+    height: 100px;
+    margin: 0 5px;
+    margin-top: -20px;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.social-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.social-login {
+    display: flex;
+    justify-content: center;
+
+}
+
+.download-app {
+    margin-bottom: 20px;
+    margin-top: 20px;
+}
+
+.download-app img {
+    height: 36px;
+    object-fit: contain;
+}
+       
+        
+        .tab-container {
+            display: flex;
+            margin-bottom: 25px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .tab {
+            padding: 10px 0;
+            margin-right: 20px;
+            font-size: 16px;
+            color: #666;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .tab.active {
+            color: #3388ff;
+            font-weight: bold;
+        }
+        
+        .tab.active:after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #3388ff;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .forgot-password {
+            position: absolute;
+            right: 0;
+            top: 10px;
+            font-size: 13px;
+        }
+        
+        .forgot-password a {
+            color: #3388ff;
+            text-decoration: none;
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 12px 15px;
+            background-color: #4e6ef2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .agreement {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            align-items: center;
+        }
+        
+        .agreement input {
+            margin-right: 5px;
+        }
+        
+        .agreement label a {
+            color: #3388ff;
+            text-decoration: none;
+        }
+        
+        .register-link {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+        }
+        
+        .register-link a {
+            color: #3388ff;
+            text-decoration: none;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img class="baidu-logo" src="图片\百度.png" alt="百度">
+        
+        <div class="qrcode-section">
+            <div class="scan-container">
+                <div class="qrcode">
+                    <img src="图片\二维码.png" alt="二维码">
+                </div>
+                <div class="app-icon">
+                    <img src="图片\扫码登录.png" alt="百度APP扫码">
+                </div>
+            </div>
+            
+            <div class="app-login">请使用百度APP扫码登录</div>
+            
+            <div class="download-app">
+                <a href="#">
+                    <img src="图片\下载百度app.png" alt="下载百度APP">
+                </a>
+            </div>
+            
+            <div class="social-login">
+                <div class="social-icon">
+                    <img src="图片\社交登录.png" alt="社交登录">
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <button class="close-btn">×</button>
+            
+            <div class="tab-container">
+                <div class="tab active">账号登录</div>
+                <div class="tab">短信登录</div>
+            </div>
+            
+            <div class="input-group">
+                <input type="text" class="input-field" placeholder="手机号/用户名/邮箱">
+            </div>
+            
+            <div class="input-group">
+                <input type="password" class="input-field" placeholder="密码">
+                <div class="forgot-password">
+                    <a href="#">忘记密码?</a>
+                </div>
+            </div>
+            
+            <button class="login-btn">登录</button>
+            
+            <div class="agreement">
+                <input type="checkbox" id="agree">
+                <label for="agree">阅读并接受<a href="#">百度用户协议</a>和<a href="#">隐私政策</a></label>
+            </div>
+            
+            <div class="register-link">
+                <a href="#">立即注册</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

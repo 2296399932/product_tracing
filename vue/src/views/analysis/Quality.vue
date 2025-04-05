@@ -236,12 +236,14 @@ export default {
       // 获取概览数据
       this.$axios.get(this.$httpUrl + '/api/analysis/quality/overview/', { params })
         .then(res => {
+          console.log('Quality overview response:', res.data)
           this.overview = res.data
           this.updateCharts(res.data)
         })
         .catch(err => {
-          this.$message.error('获取质量概览失败')
-          console.error(err)
+          console.error('获取质量概览失败:', err)
+          console.error('Error response:', err.response?.data)
+          this.$message.error('获取质量概览数据失败: ' + (err.response?.data?.error || err.message))
         })
 
       // 获取问题列表
@@ -262,52 +264,75 @@ export default {
         })
     },
     updateCharts(data) {
-      // 更新趋势图
-      const trendOption = {
-        title: { text: this.trendType === 'pass' ? '合格率趋势' : '问题数趋势' },
-        tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: data.trend.dates },
-        yAxis: { type: 'value', name: this.trendType === 'pass' ? '合格率(%)' : '问题数' },
-        series: [{
-          data: this.trendType === 'pass' ? data.trend.passRates : data.trend.issueCounts,
-          type: 'line',
-          smooth: true
-        }]
-      }
-      this.charts.trend.setOption(trendOption)
+      try {
+        // 更新趋势图
+        const trendOption = {
+          title: { text: this.trendType === 'pass' ? '合格率趋势' : '问题数趋势' },
+          tooltip: { trigger: 'axis' },
+          xAxis: { 
+            type: 'category',
+            // 使用最近30天的日期作为X轴
+            data: Array.from({ length: 30 }, (_, i) => {
+              const date = new Date()
+              date.setDate(date.getDate() - (29 - i))
+              return date.toLocaleDateString()
+            })
+          },
+          yAxis: { 
+            type: 'value',
+            name: this.trendType === 'pass' ? '合格率(%)' : '问题数',
+            min: this.trendType === 'pass' ? 0 : undefined,
+            max: this.trendType === 'pass' ? 100 : undefined
+          },
+          series: [{
+            name: this.trendType === 'pass' ? '合格率' : '问题数',
+            type: 'line',
+            smooth: true,
+            data: this.trendType === 'pass' ? 
+              (data.trend?.pass_rates || []) : 
+              (data.trend?.issue_counts || [])
+          }]
+        }
+        
+        if (this.charts.trend) {
+          this.charts.trend.setOption(trendOption)
+        }
 
-      // 更新问题类型分布图
-      const issueTypeOption = {
-        title: { text: '问题类型分布' },
-        tooltip: { trigger: 'item' },
-        legend: { orient: 'vertical', left: 'left' },
-        series: [{
-          type: 'pie',
-          radius: '50%',
-          data: data.issueTypes,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          }
-        }]
-      }
-      this.charts.issueType.setOption(issueTypeOption)
+        // 更新问题类型分布图
+        const issueTypeOption = {
+          title: { text: '问题类型分布' },
+          tooltip: { trigger: 'item' },
+          legend: { orient: 'vertical', left: 'left' },
+          series: [{
+            type: 'pie',
+            radius: '50%',
+            data: data.issueTypes?.map(item => ({
+              name: item.name,
+              value: item.count
+            })) || []
+          }]
+        }
+        this.charts.issueType.setOption(issueTypeOption)
 
-      // 更新原因分析图
-      const causeOption = {
-        title: { text: '问题原因分析' },
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        xAxis: { type: 'value' },
-        yAxis: { type: 'category', data: data.causes.map(item => item.name) },
-        series: [{
-          type: 'bar',
-          data: data.causes.map(item => item.value)
-        }]
+        // 更新原因分析图
+        const causeOption = {
+          title: { text: '问题原因分析' },
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          xAxis: { type: 'value' },
+          yAxis: { 
+            type: 'category',
+            data: data.causes?.map(item => item.name) || []
+          },
+          series: [{
+            type: 'bar',
+            data: data.causes?.map(item => item.value) || []
+          }]
+        }
+        this.charts.cause.setOption(causeOption)
+      } catch (err) {
+        console.error('Error updating charts:', err)
+        this.$message.error('更新图表失败: ' + err.message)
       }
-      this.charts.cause.setOption(causeOption)
     },
     getIssueTypeTag(type) {
       const types = {
@@ -363,6 +388,21 @@ export default {
           console.error(err)
         })
     }
+  },
+  beforeDestroy() {
+    // 销毁图表实例
+    Object.values(this.charts).forEach(chart => {
+      if (chart) {
+        try {
+          chart.dispose()
+        } catch (err) {
+          console.warn('Error disposing chart:', err)
+        }
+      }
+    })
+    
+    // 移除事件监听
+    window.removeEventListener('resize', this.handleResize)
   }
 }
 </script>

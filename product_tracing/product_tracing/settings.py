@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,10 +27,17 @@ SECRET_KEY = 'django-insecure-j7m9ib58eivq1rlbsde3c0j836#b-81hhrw432or-+83)qofzf
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.7']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.108', '192.168.1.109','192.168.1.1']
 
 
 # Application definition
+
+# 条件添加django_filters
+try:
+    import django_filters
+    HAS_DJANGO_FILTERS = True
+except ImportError:
+    HAS_DJANGO_FILTERS = False
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -39,14 +47,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
     'users',
+    'materials',
     'products',
     'tracing',
     'data_analysis',
     'rest_framework_simplejwt',
     'dashboard_app',
 ]
+
+# 只有在django_filters可用时才添加到INSTALLED_APPS
+if HAS_DJANGO_FILTERS:
+    INSTALLED_APPS.append('django_filters')
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -138,14 +152,19 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# REST_FRAMEWORK的配置
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# 只有在django_filters可用时才添加过滤器配置
+if HAS_DJANGO_FILTERS:
+    REST_FRAMEWORK['DEFAULT_FILTER_BACKENDS'] = ['django_filters.rest_framework.DjangoFilterBackend']
 
 # JWT 配置
 SIMPLE_JWT = {
@@ -155,49 +174,33 @@ SIMPLE_JWT = {
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
 # 添加日志配置
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-    },
     'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
         'file': {
-            'level': 'DEBUG',
             'class': 'logging.FileHandler',
             'filename': 'debug.log',
-            'formatter': 'verbose',
         },
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
             'propagate': True,
         },
-        'django.request': {
-            'handlers': ['file', 'console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'django.security': {
-            'handlers': ['file', 'console'],
+        'tracing': {
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': True,
         },
@@ -213,7 +216,7 @@ CACHES = {
 }
 
 # 添加CORS相关配置
-CORS_ALLOW_ALL_ORIGINS = True  # 开发环境下允许所有源
+CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
@@ -238,4 +241,8 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # 前端URL配置
-FRONTEND_URL = 'http://192.168.1.7:8080'
+FRONTEND_URL = 'http://192.168.1.108:8080'
+
+# 媒体文件配置
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

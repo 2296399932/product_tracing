@@ -24,4 +24,19 @@ urlpatterns = [
     path('quality/', views.QualityAnalysisView.as_view()),                 # ✓
 
     path('export/', views.AnalysisExportView.as_view()),  # 导出分析报告
+
+    # 销售分析
+    path('sales/overview/', views.SalesOverviewView.as_view()),
+    path('sales/details/', views.SalesDetailsView.as_view()),
+    path('sales/export/', views.SalesExportView.as_view()),
+    
+    # 追溯分析
+    path('tracing/overview/', views.TracingOverviewView.as_view()),
+    path('tracing/issues/', views.TracingIssuesView.as_view()),
+    path('tracing/export/', views.TracingExportView.as_view()),
+    
+    # 质量分析
+    path('quality/overview/', views.QualityOverviewView.as_view()),
+    path('quality/issues/', views.QualityIssuesView.as_view()),
+    path('quality/export/', views.QualityExportView.as_view()),
 ]

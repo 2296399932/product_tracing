@@ -23,7 +23,7 @@ urlpatterns = [
     
     # 用户管理
     path('users/<int:pk>/', views.UserDetailView.as_view(), name='user_detail'), # GET: 获取用户详情, PUT: 更新用户, DELETE: 删除用户
-    path('profile/', views.UserProfileView.as_view(), name='user_profile'), # GET: 获取当前用户信息, PUT: 更新当前用户信息
-    path('change-password/', views.ChangePasswordView.as_view(), name='change_password'),  # POST: 修改密码
+    path('profile/', views.UserProfileView.as_view(), name='user-profile'),
+    path('profile/change-password/', views.ChangePasswordView.as_view(), name='change-password'),
     path('', include(router.urls)),  # 包含 ViewSet 的 URL
 ]

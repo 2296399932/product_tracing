@@ -3,7 +3,7 @@
     <el-aside :width="isCollapse ? '64px' : '200px'">
       <div class="logo-container">
         <img src="@/assets/logo.png" class="logo-img">
-        <span class="logo-text" v-show="!isCollapse">产品追溯系统</span>
+        <span class="logo-text" v-show="!isCollapse">食品追溯系统</span>
       </div>
       <el-menu
         :default-active="$route.path"
@@ -44,6 +44,17 @@
           </template>
           <el-menu-item index="/products">商品列表</el-menu-item>
           <el-menu-item index="/products/batches">批次管理</el-menu-item>
+        </el-submenu>
+        
+        <!-- 原材料管理 -->
+        <el-submenu index="materials">
+          <template slot="title">
+            <i class="el-icon-box"></i>
+            <span>原材料管理</span>
+          </template>
+          <el-menu-item index="/materials">原材料列表</el-menu-item>
+          <el-menu-item index="/materials/batches">批次管理</el-menu-item>
+          <el-menu-item index="/materials/suppliers">供应商管理</el-menu-item>
         </el-submenu>
         
         <!-- 追溯管理 -->

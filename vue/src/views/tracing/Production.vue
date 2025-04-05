@@ -2,7 +2,7 @@
   <div class="production-container">
     <div class="page-header">
       <h2>生产记录管理</h2>
-      <el-button type="primary" @click="handleAdd">添加生产记录</el-button>
+      <el-button type="primary" @click="handleAdd" v-if="!isAdmin">添加生产记录</el-button>
     </div>
 
     <!-- 搜索栏 -->
@@ -44,14 +44,20 @@
       @row-click="handleRowClick">
       <el-table-column prop="batch_number" label="批次号" width="180">
         <template slot-scope="scope">
-          <span :title="JSON.stringify(scope.row)">
-            {{ scope.row.batch_number || '-' }}
-          </span>
+          <span>{{ scope.row.batch_number || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="batch_details.product.name" label="商品名称">
+      <el-table-column label="商品信息" min-width="220">
         <template slot-scope="scope">
-          {{ scope.row.batch_details?.product?.name || '-' }}
+          <div class="product-info">
+            <img v-if="scope.row.batch_details?.product_image" :src="scope.row.batch_details.product_image" class="product-image">
+            <div class="product-details">
+              <div>{{ scope.row.batch_details?.product_name || '-' }}</div>
+              <div class="specifications" v-if="scope.row.batch_details?.product_details?.specifications">
+                {{ scope.row.batch_details.product_details.specifications.description || '' }}
+              </div>
+            </div>
+          </div>
         </template>
       </el-table-column>
       <el-table-column prop="production_date" label="生产日期" width="180">
@@ -67,18 +73,27 @@
       </el-table-column>
       <el-table-column prop="temperature" label="温度" width="100">
         <template slot-scope="scope">
-          {{ scope.row.temperature ? `${scope.row.temperature}°C` : '-' }}
+          {{ scope.row.temperature }}°C
         </template>
       </el-table-column>
       <el-table-column prop="humidity" label="湿度" width="100">
         <template slot-scope="scope">
-          {{ scope.row.humidity ? `${scope.row.humidity}%` : '-' }}
+          {{ scope.row.humidity }}%
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150">
+      <el-table-column label="操作" width="220" fixed="right">
         <template slot-scope="scope">
           <el-button size="mini" @click="handleView(scope.row)">查看</el-button>
-          <el-button size="mini" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button 
+            size="mini" 
+            type="primary" 
+            @click="handleEdit(scope.row)" 
+            v-if="!isAdmin">编辑</el-button>
+          <el-button 
+            size="mini" 
+            type="danger" 
+            @click="handleDelete(scope.row)" 
+            v-if="!isAdmin">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -117,40 +132,20 @@
           </el-date-picker>
         </el-form-item>
         <el-form-item label="生产线" prop="production_line">
-          <el-input v-model="form.production_line"></el-input>
+          <el-select v-model="form.production_line" placeholder="请选择生产线">
+            <el-option
+              v-for="line in productionLines"
+              :key="line.value"
+              :label="line.label"
+              :value="line.value">
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="温度" prop="temperature">
           <el-input-number v-model="form.temperature" :precision="1" :step="0.1"></el-input-number>
         </el-form-item>
         <el-form-item label="湿度" prop="humidity">
           <el-input-number v-model="form.humidity" :precision="1" :step="0.1"></el-input-number>
-        </el-form-item>
-        <el-form-item label="原材料信息" prop="raw_materials">
-          <el-table :data="form.raw_materials" border>
-            <el-table-column prop="name" label="材料名称">
-              <template slot-scope="scope">
-                <el-input v-model="scope.row.name"></el-input>
-              </template>
-            </el-table-column>
-            <el-table-column prop="quantity" label="数量">
-              <template slot-scope="scope">
-                <el-input-number v-model="scope.row.quantity" :min="0"></el-input-number>
-              </template>
-            </el-table-column>
-            <el-table-column prop="unit" label="单位">
-              <template slot-scope="scope">
-                <el-input v-model="scope.row.unit"></el-input>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="100">
-              <template slot-scope="scope">
-                <el-button type="text" @click="removeMaterial(scope.$index)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div style="margin-top: 10px">
-            <el-button type="text" @click="addMaterial">添加原材料</el-button>
-          </div>
         </el-form-item>
         <el-form-item label="质检信息" prop="quality_check">
           <el-table :data="form.quality_check" border>
@@ -174,12 +169,12 @@
             </el-table-column>
             <el-table-column label="操作" width="100">
               <template slot-scope="scope">
-                <el-button type="text" @click="removeQualityCheck(scope.$index)">删除</el-button>
+                <el-button type="text" @click="removeQualityCheck(scope.$index)" v-if="!isAdmin">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
           <div style="margin-top: 10px">
-            <el-button type="text" @click="addQualityCheck">添加质检项</el-button>
+            <el-button type="text" @click="addQualityCheck" v-if="!isAdmin">添加质检项</el-button>
           </div>
         </el-form-item>
         <el-form-item label="备注">
@@ -188,7 +183,10 @@
       </el-form>
       <div slot="footer">
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" v-if="!form.id">确定</el-button>
+        <el-button 
+          type="primary" 
+          @click="handleSubmit" 
+          v-if="!form.id || (!isAdmin && form.id)">确定</el-button>
       </div>
     </el-dialog>
   </div>
@@ -206,6 +204,8 @@ export default {
   },
   data() {
     return {
+         isAdmin: JSON.parse(localStorage.getItem('userInfo') || '{}').role === 'admin',
+
       searchForm: {
         batch: '',
         date_range: []
@@ -217,13 +217,24 @@ export default {
       total: 0,
       dialogVisible: false,
       dialogTitle: '添加生产记录',
+      productionLines: [
+        { value: 'A-LINE-01', label: 'A区生产线1' },
+        { value: 'A-LINE-02', label: 'A区生产线2' },
+        { value: 'B-LINE-01', label: 'B区生产线1' },
+        { value: 'B-LINE-02', label: 'B区生产线2' },
+        { value: 'C-LINE-01', label: 'C区生产线1' },
+        { value: 'C-LINE-02', label: 'C区生产线2' },
+        { value: 'AUTO-01', label: '自动化生产线1' },
+        { value: 'AUTO-02', label: '自动化生产线2' },
+        { value: 'PACK-01', label: '包装生产线1' },
+        { value: 'PACK-02', label: '包装生产线2' }
+      ],
       form: {
         batch: '',
         production_date: '',
         production_line: '',
         temperature: 25,
         humidity: 50,
-        raw_materials: [],
         quality_check: [],
         remark: ''
       },
@@ -313,7 +324,6 @@ export default {
         production_line: '',
         temperature: 25,
         humidity: 50,
-        raw_materials: [],
         quality_check: [],
         remark: ''
       }
@@ -339,16 +349,6 @@ export default {
           })
       })
     },
-    addMaterial() {
-      this.form.raw_materials.push({
-        name: '',
-        quantity: 0,
-        unit: ''
-      })
-    },
-    removeMaterial(index) {
-      this.form.raw_materials.splice(index, 1)
-    },
     addQualityCheck() {
       this.form.quality_check.push({
         item: '',
@@ -359,17 +359,31 @@ export default {
     removeQualityCheck(index) {
       this.form.quality_check.splice(index, 1)
     },
+    handleEdit(row) {
+      this.dialogTitle = '编辑生产记录'
+      this.form = { 
+        ...row,
+        batch: row.batch,
+        production_date: row.production_date,
+        quality_check: row.quality_check || []
+      }
+      this.dialogVisible = true
+    },
     handleSubmit() {
       this.$refs.form.validate(valid => {
         if (valid) {
-          this.$axios.post(this.$httpUrl + '/api/tracing/production/', this.form)
+          const url = this.$httpUrl + '/api/tracing/production/' + 
+            (this.form.id ? `${this.form.id}/` : '')
+          const method = this.form.id ? 'put' : 'post'
+          
+          this.$axios[method](url, this.form)
             .then(() => {
-              this.$message.success('添加成功')
+              this.$message.success(this.form.id ? '修改成功' : '添加成功')
               this.dialogVisible = false
               this.fetchRecords()
             })
             .catch(err => {
-              this.$message.error('添加失败')
+              this.$message.error(this.form.id ? '修改失败' : '添加失败')
               console.error(err)
             })
         }
@@ -400,5 +414,25 @@ export default {
 .pagination-container {
   margin-top: 20px;
   text-align: right;
+}
+.product-info {
+  display: flex;
+  align-items: center;
+}
+.product-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  margin-right: 10px;
+  border-radius: 4px;
+}
+.product-details {
+  display: flex;
+  flex-direction: column;
+}
+.specifications {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style> 

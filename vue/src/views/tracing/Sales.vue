@@ -2,7 +2,7 @@
   <div class="sales-container">
     <div class="page-header">
       <h2>销售记录管理</h2>
-      <el-button type="primary" @click="handleAdd">添加销售记录</el-button>
+      <el-button type="primary" @click="handleAdd" v-if="!isAdmin">添加销售记录</el-button>
     </div>
 
     <!-- 搜索栏 -->
@@ -62,6 +62,19 @@
           {{ scope.row.customer_name }}
         </template>
       </el-table-column>
+      <el-table-column label="商品图片" width="100">
+        <template slot-scope="scope">
+          <el-image 
+            style="width: 50px; height: 50px"
+            :src="scope.row.batch_details?.product_details?.image_url || defaultImage"
+            :preview-src-list="scope.row.batch_details?.product_details?.image_url ? [scope.row.batch_details.product_details.image_url] : []"
+            fit="cover">
+            <div slot="error" class="image-slot">
+              <i class="el-icon-picture-outline"></i>
+            </div>
+          </el-image>
+        </template>
+      </el-table-column>
       <el-table-column prop="quantity" label="数量" width="100"></el-table-column>
       <el-table-column prop="unit_price" label="单价" width="100">
         <template slot-scope="scope">
@@ -82,7 +95,7 @@
       <el-table-column label="操作" width="150">
         <template slot-scope="scope">
           <el-button size="mini" @click="handleView(scope.row)">查看</el-button>
-          <el-button size="mini" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button size="mini" type="danger" @click="handleDelete(scope.row)" v-if="!isAdmin">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -162,7 +175,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+
 
 export default {
   name: 'SalesRecord',
@@ -180,6 +193,8 @@ export default {
   },
   data() {
     return {
+         isAdmin: JSON.parse(localStorage.getItem('userInfo') || '{}').role === 'admin',
+
       searchForm: {
         batch: '',
         date_range: [],
@@ -214,7 +229,8 @@ export default {
         unit_price: [{ required: true, message: '请输入单价', trigger: 'blur' }],
         payment_method: [{ required: true, message: '请选择支付方式', trigger: 'change' }],
         sale_date: [{ required: true, message: '请选择销售日期', trigger: 'change' }]
-      }
+      },
+        defaultImage: require('@/assets/img/bo.jpg')
     }
   },
   created() {
@@ -255,12 +271,21 @@ export default {
     async fetchRecords() {
       try {
         this.loading = true
-        // 确保请求头中包含认证 token
-        const token = localStorage.getItem('token')
-        const response = await axios.get('/api/tracing/sales/', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
+        console.log("===== 开始获取销售记录 =====")
+        console.log("请求参数:", {
+          page: this.page,
+          page_size: this.pageSize,
+          batch: this.searchForm.batch,
+          date_from: this.searchForm.date_range?.[0]?.toISOString(),
+          date_to: this.searchForm.date_range?.[1]?.toISOString(),
+          customer: this.searchForm.customer
+        })
+        
+        // 记录当前用户信息
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+        console.log("当前用户:", userInfo.username, "角色:", userInfo.role)
+        
+        const response = await this.$axios.get(this.$httpUrl + '/api/tracing/sales/', {
           params: {
             page: this.page,
             page_size: this.pageSize,
@@ -270,13 +295,32 @@ export default {
             customer: this.searchForm.customer
           }
         })
-        this.records = response.data.results
-        console.log(1111111)
-        console.log( this.records)
-        console.log(2222)
-        this.total = response.data.count
+        
+        console.log("响应状态:", response.status)
+        console.log("响应头:", response.headers)
+        console.log("完整响应:", response.data)
+        
+        // 检查响应格式，适配直接返回数组的情况
+        if (Array.isArray(response.data)) {
+          // 直接返回的数组
+          this.records = response.data
+          this.total = response.data.length
+        } else if (response.data && response.data.results) {
+          // 分页格式
+          this.records = response.data.results
+          this.total = response.data.count
+        } else {
+          // 未知格式
+          this.records = []
+          this.total = 0
+          console.warn("未知的响应数据格式:", response.data)
+        }
+        
+        console.log("获取到的记录数:", this.records.length)
+        console.log("===== 获取销售记录结束 =====")
       } catch (error) {
         console.error('Error fetching sales records:', error)
+        console.error('错误详情:', error.response?.data || error.message)
         this.$message.error('获取销售记录失败')
       } finally {
         this.loading = false
